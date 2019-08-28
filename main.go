@@ -16,6 +16,7 @@ import (
 )
 
 // just some random key I generated from status-console-client
+// TODO generat key on the fly or take it from cli argumens
 const keyHex string = "4f7db2c72e3dd604b2be4258680844f1b66c911ab13701f5f33f5f5c03103221"
 const fleet string = params.FleetBeta
 const dataDir string = "/tmp/status-client-client"
@@ -94,7 +95,9 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
+	// TODO parametrize the message to be sent
 	data := []byte("THIS IS A TEST MESSAGE")
 	chat := status.Chat{ID: chatName, Name: chatName}
+	// TODO error handling
 	messenger.Send(ctx, chat, data)
 }
