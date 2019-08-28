@@ -72,10 +72,7 @@ func main() {
 		exitErr(errors.Wrap(err, "failed to get Whisper service"))
 	}
 
-    var instID string = uuid.New().String()
-	options := []status.Option{
-		status.WithMessagesPersistenceEnabled(),
-	}
+	var instID string = uuid.New().String()
 
 	privateKey, err := crypto.HexToECDSA(keyHex)
 	if err != nil {
@@ -85,8 +82,7 @@ func main() {
 	messenger, err := status.NewMessenger(
 		privateKey,
 		shhService,
-		instID,
-		options...,
+		instID
 	)
 	if err != nil {
 		exitErr(errors.Wrap(err, "failed to create Messenger"))
