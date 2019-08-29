@@ -82,7 +82,7 @@ func main() {
 	messenger, err := status.NewMessenger(
 		privateKey,
 		shhService,
-		instID
+		instID,
 	)
 	if err != nil {
 		exitErr(errors.Wrap(err, "failed to create Messenger"))
