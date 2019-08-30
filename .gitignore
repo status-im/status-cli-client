@@ -15,6 +15,6 @@
 bin/*
 notes/*
 
-status-console-client
+status-cli-client
 
 .vscode
