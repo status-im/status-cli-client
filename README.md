@@ -21,6 +21,8 @@ Usage of ./status-cli-client:
     	Message to send to the public channel. (default "TEST")
   -port int
     	Listening port for Whisper node thread. (default 30303)
+  -timeout int
+    	Timeout for message delivery in milliseconds. (default 500)
 ```
 
 Example usage would be:

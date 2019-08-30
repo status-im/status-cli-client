@@ -39,11 +39,12 @@ func (k keysGetter) PrivateKey() (*ecdsa.PrivateKey, error) {
 }
 
 // flag variables
-var port int
+var port, timeout int
 var addr, chatName, keyHex, dataDir, message string
 
 func flagsInit() {
 	flag.IntVar(&port, "port", 30303, "Listening port for Whisper node thread.")
+	flag.IntVar(&timeout, "timeout", 500, "Timeout for message delivery in milliseconds.")
 	flag.StringVar(&addr, "addr", "0.0.0.0", "Listening address for Whisper node thread.")
 	flag.StringVar(&chatName, "chat", "whatever", "Name of public chat to send to.")
 	flag.StringVar(&keyHex, "key", "", "Hex private key for your Status identity.")
@@ -118,7 +119,9 @@ func main() {
 		exitErr(errors.Wrap(err, "failed to create Messenger"))
 	}
 	
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(
+		context.Background(),
+		time.Duration(timeout) * time.Millisecond)
 	defer cancel()
 
 	payload := []byte(message)
@@ -127,5 +130,5 @@ func main() {
 	messenger.Send(ctx, chat, payload)
 
 	// FIXME this is an ugly hack, wait for delivery event properly
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(time.Duration(timeout + 100) * time.Millisecond)
 }
