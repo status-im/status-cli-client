@@ -102,6 +102,7 @@ func main() {
 
 	var instID string = uuid.New().String()
 
+	// Using an in-memory SQLite DB since we have nothing worth preserving
 	db, _ := sql.Open("sqlite3", "file:mem?mode=memory&cache=shared")
 	options := []status.Option{
 		status.WithDatabase(db),
