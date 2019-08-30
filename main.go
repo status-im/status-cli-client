@@ -103,4 +103,6 @@ func main() {
 	chat := status.Chat{ID: chatName, Name: chatName}
 	// TODO error handling
 	messenger.Send(ctx, chat, data)
+	// FIXME this is a hack, wait for delivery event properly
+	time.Sleep(1 * time.Second)
 }
