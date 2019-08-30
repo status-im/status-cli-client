@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 	"context"
+	"database/sql"
 	"crypto/ecdsa"
 	"github.com/pkg/errors"
 	"github.com/google/uuid"
@@ -19,7 +20,7 @@ import (
 // TODO generat key on the fly or take it from cli argumens
 const keyHex string = "4f7db2c72e3dd604b2be4258680844f1b66c911ab13701f5f33f5f5c03103221"
 const fleet string = params.FleetBeta
-const dataDir string = "/tmp/status-client-client"
+const dataDir string = "/tmp/status-cli-client"
 const listenAddr string = ":30303"
 const chatName string = "whatever"
 
@@ -79,10 +80,16 @@ func main() {
 		exitErr(err)
 	}
 
+	db, _ := sql.Open("sqlite3", "file:mem?mode=memory&cache=shared")
+	options := []status.Option{
+		status.WithDatabase(db),
+	}
+
 	messenger, err := status.NewMessenger(
 		privateKey,
 		shhService,
 		instID,
+		options...,
 	)
 	if err != nil {
 		exitErr(errors.Wrap(err, "failed to create Messenger"))
