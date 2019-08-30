@@ -41,14 +41,12 @@ func (k keysGetter) PrivateKey() (*ecdsa.PrivateKey, error) {
 // flag variables
 var port int
 var addr, chatName, keyHex, dataDir, message string
-// randomly generated private key for tests
-var defaultKey string = "0x4f7db2c72e3dd604b2be4258680844f1b66c911ab13701f5f33f5f5c03103221"
 
 func flagsInit() {
 	flag.IntVar(&port, "port", 30303, "Listening port for Whisper node thread.")
 	flag.StringVar(&addr, "addr", "0.0.0.0", "Listening address for Whisper node thread.")
 	flag.StringVar(&chatName, "chat", "whatever", "Name of public chat to send to.")
-	flag.StringVar(&keyHex, "key", defaultKey, "Hex private key for your Status identity.")
+	flag.StringVar(&keyHex, "key", "", "Hex private key for your Status identity.")
 	flag.StringVar(&dataDir, "data", "/tmp/status-cli-client", "Location for Status data.")
 	flag.StringVar(&message, "message", "TEST", "Message to send to the public channel.")
 	flag.Parse()
@@ -56,6 +54,23 @@ func flagsInit() {
 
 func main() {
 	flagsInit()
+
+	// Generate private key if it's not provided through a CLI flag
+	var privateKey *ecdsa.PrivateKey
+	if (keyHex == "") {
+		if key, err := crypto.GenerateKey(); err != nil {
+			exitErr(err)
+		} else {
+			privateKey = key
+		}
+	} else {
+		if key, err := crypto.HexToECDSA(strings.TrimPrefix(keyHex, "0x")); err != nil {
+			exitErr(err)
+		} else {
+			privateKey = key
+		}
+	}
+	fmt.Printf("Using private key: %#x\n", crypto.FromECDSA(privateKey))
 
 	var configFiles []string
 	// create a new status-go config
@@ -86,11 +101,6 @@ func main() {
 	}
 
 	var instID string = uuid.New().String()
-
-	privateKey, err := crypto.HexToECDSA(strings.TrimPrefix(keyHex, "0x"))
-	if err != nil {
-		exitErr(err)
-	}
 
 	db, _ := sql.Open("sqlite3", "file:mem?mode=memory&cache=shared")
 	options := []status.Option{
