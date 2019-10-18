@@ -16,6 +16,8 @@ import (
 	status "github.com/status-im/status-protocol-go"
 	params "github.com/status-im/status-go/params"
 	gonode "github.com/status-im/status-go/node"
+	whisper "github.com/status-im/whisper/whisperv6"
+	gethbridge "github.com/status-im/status-protocol-go/bridge/geth"
 )
 
 func exitErr(err error) {
@@ -96,11 +98,8 @@ func main() {
 		exitErr(errors.Wrap(err, "failed to start node"))
 	}
 
-	shhService, err := statusNode.WhisperService()
-	if err != nil {
-		exitErr(errors.Wrap(err, "failed to get Whisper service"))
-	}
-
+	shh := whisper.New(&whisper.DefaultConfig)
+	var shhService = gethbridge.NewGethWhisperWrapper(shh)
 	var instID string = uuid.New().String()
 
 	// Using an in-memory SQLite DB since we have nothing worth preserving
@@ -125,9 +124,8 @@ func main() {
 	defer cancel()
 
 	payload := []byte(message)
-	chat := status.Chat{ID: chatName, Name: chatName}
 	// TODO error handling
-	messenger.Send(ctx, chat, payload)
+	messenger.Send(ctx, chatName, payload)
 
 	// FIXME this is an ugly hack, wait for delivery event properly
 	time.Sleep(time.Duration(timeout + 100) * time.Millisecond)
