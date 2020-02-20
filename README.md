@@ -2,7 +2,7 @@
 
 This is a dead-simple CLI client for sending Status messages.
 
-It uses the [`status-protocol-go`](https://github.com/status-im/status-protocol-go) library and is essentially a very basic example of its usage.
+It uses the [`status-go`](https://github.com/status-im/status-go) library and is essentially a very basic example of its usage.
 
 # Usage
 
