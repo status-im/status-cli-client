@@ -1,23 +1,25 @@
 package main
 
 import (
-	"os"
-	"fmt"
-	"time"
-	"flag"
 	"context"
-	"strings"
-	"database/sql"
 	"crypto/ecdsa"
-	"github.com/pkg/errors"
-	"github.com/google/uuid"
+	"database/sql"
+	"flag"
+	"fmt"
+	"os"
+	"strings"
+	"time"
 
-	"github.com/ethereum/go-ethereum/crypto"
-	status "github.com/status-im/status-protocol-go"
-	params "github.com/status-im/status-go/params"
+	"github.com/google/uuid"
+	"github.com/pkg/errors"
+	"go.uber.org/zap"
+
+	crypto "github.com/ethereum/go-ethereum/crypto"
+	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	gonode "github.com/status-im/status-go/node"
-	whisper "github.com/status-im/whisper/whisperv6"
-	gethbridge "github.com/status-im/status-protocol-go/bridge/geth"
+	params "github.com/status-im/status-go/params"
+	status "github.com/status-im/status-go/protocol"
+	protobuf "github.com/status-im/status-go/protocol/protobuf"
 )
 
 func exitErr(err error) {
@@ -25,19 +27,8 @@ func exitErr(err error) {
 	os.Exit(1)
 }
 
-func withListenAddr(listenAddr string) params.Option {
-	return func(c *params.NodeConfig) error {
-		c.ListenAddr = listenAddr
-		return nil
-	}
-}
-
 type keysGetter struct {
 	privateKey *ecdsa.PrivateKey
-}
-
-func (k keysGetter) PrivateKey() (*ecdsa.PrivateKey, error) {
-	return k.privateKey, nil
 }
 
 // flag variables
@@ -60,7 +51,7 @@ func main() {
 
 	// Generate private key if it's not provided through a CLI flag
 	var privateKey *ecdsa.PrivateKey
-	if (keyHex == "") {
+	if keyHex == "" {
 		if key, err := crypto.GenerateKey(); err != nil {
 			exitErr(err)
 		} else {
@@ -73,60 +64,105 @@ func main() {
 			privateKey = key
 		}
 	}
-	fmt.Printf("Using private key: %#x\n", crypto.FromECDSA(privateKey))
+	fmt.Printf("Private Key: %#x\n", crypto.FromECDSA(privateKey))
 
-	var configFiles []string
-	// create a new status-go config
-	config, err := params.NewNodeConfigWithDefaultsAndFiles(
-		dataDir,
-		params.MainNetworkID,
-		[]params.Option{
-			params.WithFleet(params.FleetBeta),
-			withListenAddr(fmt.Sprintf("%s:%d", addr, port)),
-		},
-		configFiles,
-	)
+	nodeConfig, err := generateConfig(dataDir, addr, port)
 	if err != nil {
-		exitErr(err)
+		exitErr(errors.Wrap(err, "failed generate config"))
 	}
 
 	statusNode := gonode.New()
-
 	accsMgr, _ := statusNode.AccountManager()
 
-	if err := statusNode.Start(config, accsMgr); err != nil {
+	if err := statusNode.Start(nodeConfig, accsMgr); err != nil {
 		exitErr(errors.Wrap(err, "failed to start node"))
 	}
 
-	shh := whisper.New(&whisper.DefaultConfig)
-	var shhService = gethbridge.NewGethWhisperWrapper(shh)
-	var instID string = uuid.New().String()
-
 	// Using an in-memory SQLite DB since we have nothing worth preserving
-	db, _ := sql.Open("sqlite3", "file:mem?mode=memory&cache=shared")
+	db, err := sql.Open("sqlite3", "file:mem?mode=memory&cache=shared")
+	if err != nil {
+		exitErr(errors.Wrap(err, "failed to open sqlite database"))
+	}
+
+	// Create a custom logger to suppress Status logs
+	logger := zap.NewNop()
+
 	options := []status.Option{
 		status.WithDatabase(db),
+		status.WithCustomLogger(logger),
 	}
+
+	var instID string = uuid.New().String()
 
 	messenger, err := status.NewMessenger(
 		privateKey,
-		shhService,
+		gethbridge.NewNodeBridge(statusNode.GethNode()),
 		instID,
 		options...,
 	)
 	if err != nil {
 		exitErr(errors.Wrap(err, "failed to create Messenger"))
 	}
-	
+	if err := messenger.Start(); err != nil {
+		exitErr(errors.Wrap(err, "failed to start Messenger"))
+	}
+	if err := messenger.Init(); err != nil {
+		exitErr(errors.Wrap(err, "failed to init Messenger"))
+	}
+
+	// Join the channel
+	chat := status.CreatePublicChat(chatName, messenger.Timesource())
+	messenger.Join(chat)
+	messenger.SaveChat(&chat)
+
 	ctx, cancel := context.WithTimeout(
 		context.Background(),
-		time.Duration(timeout) * time.Millisecond)
+		time.Duration(timeout)*time.Millisecond)
 	defer cancel()
 
-	payload := []byte(message)
-	// TODO error handling
-	messenger.Send(ctx, chatName, payload)
+	// Crate the Status chat message
+	var statusMsg status.Message
+	statusMsg.Text = message
+	statusMsg.ChatId = chatName
+	statusMsg.ContentType = protobuf.ChatMessage_TEXT_PLAIN
+	fmt.Println("Destination:", chatName)
+	fmt.Println("Message:", message)
+
+	resp, err := messenger.SendChatMessage(ctx, &statusMsg)
+	if err != nil {
+		exitErr(errors.Wrap(err, "failed to send message"))
+	}
+
+	// keccak256(compressedAuthorPubKey, data)
+	fmt.Printf("Message ID: %v\n", resp.Messages[0].ID)
 
 	// FIXME this is an ugly hack, wait for delivery event properly
-	time.Sleep(time.Duration(timeout + 100) * time.Millisecond)
+	time.Sleep(time.Duration(timeout+100) * time.Millisecond)
+}
+
+// Generate a sane configuration for a Status Node
+func generateConfig(dataDir, addr string, port int) (*params.NodeConfig, error) {
+	options := []params.Option{
+		params.WithFleet(params.FleetProd),
+		withListenAddr(addr, port),
+	}
+
+	var configFiles []string
+	config, err := params.NewNodeConfigWithDefaultsAndFiles(
+		dataDir,
+		params.MainNetworkID,
+		options,
+		configFiles,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return config, nil
+}
+
+func withListenAddr(addr string, port int) params.Option {
+	return func(c *params.NodeConfig) error {
+		c.ListenAddr = fmt.Sprintf("%s:%d", addr, port)
+		return nil
+	}
 }
