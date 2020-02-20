@@ -15,6 +15,8 @@ Usage of ./status-cli-client:
     	Name of public chat to send to. (default "whatever")
   -data string
     	Location for Status data. (default "/tmp/status-cli-client")
+  -ens string
+    	ENS name to send with the message.
   -key string
     	Hex private key for your Status identity.
   -message string

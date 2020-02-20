@@ -33,7 +33,7 @@ type keysGetter struct {
 
 // flag variables
 var port, timeout int
-var addr, chatName, keyHex, dataDir, message string
+var addr, chatName, keyHex, dataDir, message, ensName string
 
 func flagsInit() {
 	flag.IntVar(&port, "port", 30303, "Listening port for Whisper node thread.")
@@ -43,6 +43,7 @@ func flagsInit() {
 	flag.StringVar(&keyHex, "key", "", "Hex private key for your Status identity.")
 	flag.StringVar(&dataDir, "data", "/tmp/status-cli-client", "Location for Status data.")
 	flag.StringVar(&message, "message", "TEST", "Message to send to the public channel.")
+	flag.StringVar(&ensName, "ens", "", "ENS name to send with the message.")
 	flag.Parse()
 }
 
@@ -124,6 +125,7 @@ func main() {
 	var statusMsg status.Message
 	statusMsg.Text = message
 	statusMsg.ChatId = chatName
+	statusMsg.EnsName = ensName
 	statusMsg.ContentType = protobuf.ChatMessage_TEXT_PLAIN
 	fmt.Println("Destination:", chatName)
 	fmt.Println("Message:", message)
