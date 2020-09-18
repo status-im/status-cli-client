@@ -122,15 +122,15 @@ func main() {
 	defer cancel()
 
 	// Crate the Status chat message
-	var statusMsg status.Message
-	statusMsg.Text = message
-	statusMsg.ChatId = chatName
-	statusMsg.EnsName = ensName
-	statusMsg.ContentType = protobuf.ChatMessage_TEXT_PLAIN
+	msg := &status.Message{}
+	msg.Text = message
+	msg.ChatId = chatName
+	msg.EnsName = ensName
+	msg.ContentType = protobuf.ChatMessage_TEXT_PLAIN
 	fmt.Println("Destination:", chatName)
 	fmt.Println("Message:", message)
 
-	resp, err := messenger.SendChatMessage(ctx, &statusMsg)
+	resp, err := messenger.SendChatMessage(ctx, msg)
 	if err != nil {
 		exitErr(errors.Wrap(err, "failed to send message"))
 	}
